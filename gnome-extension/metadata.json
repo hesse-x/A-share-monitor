@@ -1,0 +1,8 @@
+{
+    "uuid": "stock-ticker@hesse",
+    "name": "红色数字状态栏显示",
+    "description": "在状态栏显示两行红色居中数字（800 和 100%）",
+    "version": 1,
+    "shell-version": ["3.36", "3.38", "40", "41", "42", "43", "44"],
+    "url": "https://example.com"
+}
