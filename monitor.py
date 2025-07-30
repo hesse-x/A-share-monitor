@@ -184,7 +184,7 @@ class AStockTicker(Gtk.Window):
         
         if self.data and len(self.data) > 4:
             try:
-                price0 = float(self.data[1])  # Opening price
+                price0 = float(self.data[2])  # Yesterday's closing price
                 price = float(self.data[3])   # Current price
                 change = price - price0
                 change_percent = (change / price0) * 100 if price0 != 0 else 0
