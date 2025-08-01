@@ -1,9 +1,8 @@
-import requests
 import gi
 import sys
 import cairo
-from datetime import datetime
 import signal
+import utils
 
 # Initialize GTK and Pango
 gi.require_version('Gtk', '3.0')
@@ -160,27 +159,12 @@ class AStockTicker(Gtk.Window):
         elif event.type == Gdk.EventType.BUTTON_RELEASE:
             self.drag_enabled = False
         return False
-    
-    def is_trading_time(self):
-        """Check if current time is within stock market trading hours"""
-        now = datetime.now()
-        # Not trading on weekends
-        if now.weekday() >= 5:
-            return False
-        
-        hour, minute = now.hour, now.minute
-        # Morning session: 9:15-11:30, but last update should after 11:30, so delay 2 minutes
-        morning = (hour == 9 and minute >= 15) or (10 <= hour < 11) or (hour == 11 and minute <= 32)
-        # Afternoon session: 13:00-15:00, but last update should after 15:00, so delay 2 minutes
-        afternoon = (13 <= hour < 15) or (hour == 15 and minute <= 2)
-        
-        return morning or afternoon
 
     def update_data(self):
         """Update stock data, refresh display"""
         # Only fetch new data during trading hours or if no data exists
-        if self.is_trading_time() or self.data is None:
-            self.data = get_sina_stock_price(self.code)
+        if utils.is_trading_time() or self.data is None:
+            self.data = utils.get_sina_stock_price(self.code)
         
         if self.data and len(self.data) > 4:
             try:
@@ -209,23 +193,6 @@ class AStockTicker(Gtk.Window):
         
         # Return True to keep the timeout active
         return True
-
-def get_sina_stock_price(stock_code):
-    """Fetch stock price from Sina Finance API"""
-    url = f'http://hq.sinajs.cn/list={stock_code}'
-    headers = {
-        'Referer': 'https://finance.sina.com.cn/',
-        'User-Agent': 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
-    }
-    try:
-        response = requests.get(url, headers=headers)
-        response.encoding = 'gbk'
-        if 'var hq_str_' in response.text:
-            # Extract and split the data string
-            return response.text.split('"')[1].split(',')
-    except Exception as e:
-        print(f"Request failed: {e}")
-    return None
 
 if __name__ == "__main__":
     # Check if stock code is provided as command line argument

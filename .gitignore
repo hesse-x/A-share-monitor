@@ -1,2 +1,6 @@
 log
 *.out
+*.bk
+*.swp
+*.swo
+__pycache__
