@@ -16,6 +16,7 @@
 #include <QString>
 #include <QtGlobal>
 
+constexpr int lineNum = 4;
 class DataOnlyMode final : public DisplayMode {
 public:
   std::pair<int64_t, int64_t> calculateWindowSize(int64_t desktopWidth,
@@ -31,8 +32,6 @@ private:
                              const Stock *stock, int startY, int width,
                              int height);
 };
-
-constexpr int lineNum = 4;
 
 std::pair<int64_t, int64_t>
 DataOnlyMode::calculateWindowSize(int64_t desktopWidth, int64_t desktoHeight,

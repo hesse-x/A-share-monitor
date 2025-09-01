@@ -3,6 +3,7 @@
 #include <cstdint>
 #include <map>
 #include <memory>
+#include <string>
 #include <utility>
 
 #include "display_mode.h"
@@ -181,10 +182,19 @@ void LineChartMode::drawSingleTextNumbers(QPainter *painter,
   painter->setBrush(Qt::NoBrush);
   painter->setFont(QFont("Arial Narrow", baseFontSize, QFont::Bold));
 
+  int curY = startY;
+  // First line: stock name
+  const auto &name = stock->getName();
+  QString nameText(QString::fromUtf8(name.data(), name.size()));
+  if (nameText.length() >= 4)
+    nameText = nameText.left(2) + "...";
+  painter->drawText(0, curY, width, baseFontSize, Qt::AlignCenter, nameText);
+  curY += (baseFontSize + lineSpacing);
+
   // First line: current value
   QString currentText = QString("%1").arg(stock->getCurrentNumber(), 0, 'f', 2);
-  painter->drawText(0, startY, width, baseFontSize, Qt::AlignCenter,
-                    currentText);
+  painter->drawText(0, curY, width, baseFontSize, Qt::AlignCenter, currentText);
+  curY += (baseFontSize + lineSpacing);
 
   // Second line: difference
   auto diff = stock->getDifference();
@@ -192,8 +202,8 @@ void LineChartMode::drawSingleTextNumbers(QPainter *painter,
   if (diff >= 0) {
     diffText = "+" + diffText;
   }
-  painter->drawText(0, startY + baseFontSize + lineSpacing, width, baseFontSize,
-                    Qt::AlignCenter, diffText);
+  painter->drawText(0, curY, width, baseFontSize, Qt::AlignCenter, diffText);
+  curY += (baseFontSize + lineSpacing);
 
   // Third line: percentage
   QString percentText =
@@ -201,8 +211,7 @@ void LineChartMode::drawSingleTextNumbers(QPainter *painter,
   if (diff >= 0) {
     percentText = "+" + percentText;
   }
-  painter->drawText(0, startY + baseFontSize * 2 + lineSpacing * 2, width,
-                    baseFontSize, Qt::AlignCenter, percentText);
+  painter->drawText(0, curY, width, baseFontSize, Qt::AlignCenter, percentText);
 }
 
 bool LineChartMode::regist = DisplayMode::registCreator(
