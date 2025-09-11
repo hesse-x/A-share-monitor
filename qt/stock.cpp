@@ -2,6 +2,7 @@
 #include <cstddef>
 #include <optional>
 
+#include "logger.h"
 #include "stock.h"
 #include "stock_fetcher.h"
 
@@ -17,10 +18,11 @@ Stock::Stock(std::string stock_code) : baseData(0.0) {
         StockFetcher::create(StockFetcher::Type::kSina, stock_code));
   }
   auto newData = dataFetcher->fetchData(&name);
-  if (newData.has_value()) {
-    baseData = newData->yesterdayPrice;
-    historyData.push_back(historyData.capacity(), newData->curPrice);
+  if (!newData.has_value()) {
+    LOG(ERROR) << "fetch data failed, stock_code: " << stock_code;
   }
+  baseData = newData->yesterdayPrice;
+  historyData.push_back(historyData.capacity(), newData->curPrice);
 }
 
 // Check if current time is within trading hours

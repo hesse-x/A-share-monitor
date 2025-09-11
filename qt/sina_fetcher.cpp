@@ -98,7 +98,8 @@ SinaStockFetcher::parseReturnInfo(std::string_view response_data,
                          .yesterdayPrice = infos[2],
                          .openPrice = infos[1]};
     } else {
-      LOG(ERROR) << "Data format error, insufficient fields";
+      LOG(ERROR) << "Data format error, insufficient fields, stock code: "
+                 << stockCode;
     }
   } else {
     LOG(ERROR) << "Failed to parse response data";
