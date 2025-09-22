@@ -5,11 +5,18 @@
 #include <ctime>
 #include <string>
 
+static inline void localtime(time_t *now, tm *timeinfo) {
+#ifdef _WIN32
+  localtime_s(timeinfo, now);
+#else
+  localtime_r(now, timeinfo);
+#endif
+}
+
 static inline void getCurrentTime(char *buffer, size_t len) {
   time_t now = time(nullptr);
   struct tm timeinfo;
-  localtime_r(&now, &timeinfo); // 线程安全版本
-
+  localtime(&now, &timeinfo);
   strftime(buffer, len, "[%Y-%m-%d %H:%M:%S]", &timeinfo);
   return;
 }

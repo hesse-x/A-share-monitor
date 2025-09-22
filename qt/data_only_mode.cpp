@@ -46,11 +46,7 @@ DataOnlyMode::calculateWindowSize(int64_t desktopWidth, int64_t desktoHeight,
   QString sampleText = "+123.45%"; // Sample text for width calculation
   QFont font("Arial Narrow", baseFontSize, QFont::Bold);
   QFontMetrics fm(font);
-#ifdef QT6_OR_NEWER
-  int textWidth = fm.horizontalAdvance(sampleText) + 10; // Qt6 recommended
-#else
-  int textWidth = fm.width(sampleText) + 10; // Qt5 compatible
-#endif
+  int textWidth = fm.horizontalAdvance(sampleText) + 10;
   return {textWidth, totalTextHeight};
 }
 
