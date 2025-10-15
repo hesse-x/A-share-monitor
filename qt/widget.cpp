@@ -1,14 +1,15 @@
 #include <cstddef>
-#include <cstdint>
-#include <map>
+#include <set>
 #include <utility>
 
+#include "config_dialog.h"
 #include "config_parser.h"
 #include "stock.h"
 #include "widget.h"
 
 #include <QAction>
 #include <QApplication>
+#include <QDialog>
 #include <QInternal>
 #include <QMenu>
 #include <QMetaObject>
@@ -34,9 +35,6 @@ static inline std::pair<int, int> getDesktopSize() {
 }
 #endif
 
-constexpr int64_t kShowLineChartPos = 0;
-constexpr int64_t kShowDataOnlyPos = 1;
-constexpr int64_t kExitPos = 2;
 Widget::RollingDisplayState::RollingDisplayState() {}
 Widget::RollingDisplayState::RollingDisplayState(
     const std::vector<std::string> &codes) {
@@ -72,16 +70,23 @@ Widget::Widget(const ConfigData &config, QWidget *parent)
   updateTimer.start(config.freq);
 
   // Create right-click menu items
-  actions[kShowLineChartPos] =
+  actions[static_cast<int>(MenuItemEnum::kShowLineChartPos)] =
       std::make_unique<QAction>("Show Line Chart", this);
-  actions[kShowDataOnlyPos] = std::make_unique<QAction>("Show Data Only", this);
-  actions[kExitPos] = std::make_unique<QAction>("Exit", this);
+  actions[static_cast<int>(MenuItemEnum::kShowDataOnlyPos)] =
+      std::make_unique<QAction>("Show Data Only", this);
+  actions[static_cast<int>(MenuItemEnum::kConfigPos)] =
+      std::make_unique<QAction>("Config", this);
+  actions[static_cast<int>(MenuItemEnum::kExitPos)] =
+      std::make_unique<QAction>("Exit", this);
 
-  connect(actions[kShowLineChartPos].get(), &QAction::triggered, this,
-          &Widget::onShowLineChart);
-  connect(actions[kShowDataOnlyPos].get(), &QAction::triggered, this,
-          &Widget::onShowOnlyData);
-  connect(actions[kExitPos].get(), &QAction::triggered, this, &Widget::onExit);
+  connect(actions[static_cast<int>(MenuItemEnum::kShowLineChartPos)].get(),
+          &QAction::triggered, this, &Widget::onShowLineChart);
+  connect(actions[static_cast<int>(MenuItemEnum::kShowDataOnlyPos)].get(),
+          &QAction::triggered, this, &Widget::onShowOnlyData);
+  connect(actions[static_cast<int>(MenuItemEnum::kConfigPos)].get(),
+          &QAction::triggered, this, &Widget::onConfig);
+  connect(actions[static_cast<int>(MenuItemEnum::kExitPos)].get(),
+          &QAction::triggered, this, &Widget::onExit);
 
   // Set window size
   updateWindowSize();
@@ -159,6 +164,37 @@ void Widget::onShowOnlyData() { switchTo<DisplayMode::Type::kDataOnly>(); }
 void Widget::onDataUpdated() {
   // Refresh interface when data is updated
   update();
+}
+
+void Widget::onConfig() {
+  ConfigDialog dialog(state.stocks, this);
+  if (dialog.exec() == QDialog::Accepted) {
+    auto deleted = dialog.getDeletedCodes();
+    auto added = dialog.getAddedCodes();
+
+    // Erase stock.
+    for (const auto &code : deleted) {
+      auto it = state.stocks.find(std::make_unique<Stock>(code));
+      if (it != state.stocks.end()) {
+        state.stocks.erase(it);
+      }
+    }
+
+    // Insert stock.
+    for (const auto &code : added) {
+      state.stocks.insert(std::make_unique<Stock>(code));
+    }
+
+    // Update iter.
+    state.curIt = state.stocks.begin();
+
+    // Refresh UI.
+    resetRolling();
+    updateWindowSize();
+    update();
+    fetchLatestData();
+    emit dataUpdated();
+  }
 }
 
 void Widget::onExit() {

@@ -41,6 +41,8 @@ set(SOURCES
     stock.cpp
     logger.cpp
     config_parser.cpp
+    config_dialog.cpp
+    config_dialog.ui
 # stock fetcher
     stock_fetcher.cpp
     sina_fetcher.cpp

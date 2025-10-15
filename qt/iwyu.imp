@@ -64,5 +64,11 @@
   { include: [ "<qtextcodec.h>", private, "<QTextCodec>", public ] },
   { include: [ "<qobject.h>", private, "<QObject>", public ] },
   { include: [ "<qurl.h>", private, "<QUrl>", public ] },
+  { include: [ "<qdialog.h>", private, "<QDialog>", public ] },
+  { include: [ "<qinputdialog.h>", private, "<QInputDialog>", public ] },
+  { include: [ "<qlineedit.h>", private, "<QLineEdit>", public ] },
+  { include: [ "<qlist.h>", private, "<QList>", public ] },
+  { include: [ "<qlistwidget.h>", private, "<QListWidget>", public ] },
+  { include: [ "<qmessagebox.h>", private, "<QMessageBox>", public ] },
 
 ]

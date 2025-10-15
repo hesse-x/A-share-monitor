@@ -3,5 +3,7 @@ log
 *.bk
 *.swp
 *.swo
+*.swn
+*.swm
 __pycache__
 build

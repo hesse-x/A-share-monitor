@@ -53,7 +53,8 @@ private slots:
   void onDataUpdated();
   void onShowLineChart(); // Show line chart
   void onShowOnlyData();  // Show data only
-  void onExit();
+  void onConfig();        // Config
+  void onExit();          // Exit
 
 signals:
   // Emitted when data is updated
@@ -74,8 +75,16 @@ private:
   QTimer updateTimer;  // Timer for periodic updates
   QTimer rollingTimer; // Timer for periodic updates
   QPoint m_dragStartPosition;
-  // Menu item {"Show line chart", "Show data only", "Exit"}
-  std::array<std::unique_ptr<QAction>, 3> actions;
+  // Menu item {"Show line chart", "Show data only", "Config", "Exit"}
+  enum class MenuItemEnum : int {
+    kShowLineChartPos = 0,
+    kShowDataOnlyPos,
+    kConfigPos,
+    kExitPos,
+    kNum
+  };
+  std::array<std::unique_ptr<QAction>, static_cast<int>(MenuItemEnum::kNum)>
+      actions;
   std::array<std::unique_ptr<DisplayMode>,
              static_cast<int>(DisplayMode::Type::kNum)>
       displayMode;

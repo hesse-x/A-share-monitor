@@ -1,6 +1,7 @@
 #include <algorithm>
 #include <cstddef>
 #include <optional>
+#include <ostream>
 
 #include "logger.h"
 #include "stock.h"
