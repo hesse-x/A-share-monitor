@@ -37,10 +37,6 @@ bool StockFetcher::registCreator(
   return true;
 }
 
-StockFetcher *StockFetcher::create(Type type, std::string stockCode) {
-  return creators[static_cast<int>(type)](stockCode);
-};
-
 std::string NetworkFetcher::fetch() {
   // Singleton QNetworkAccessManager for efficient network operations
   static QNetworkAccessManager manager;
@@ -77,3 +73,7 @@ std::string NetworkFetcher::gbk2utf8(std::string_view in) {
   QString unicodeStr = gbkCodec->toUnicode(gbkData);
   return unicodeStr.toUtf8().toStdString();
 }
+
+StockFetcher *StockFetcher::create(Type type, std::string stockCode) {
+  return creators[static_cast<int>(type)](stockCode);
+};

@@ -33,6 +33,9 @@ public:
   static StockFetcher *create(Type type, std::string stockCode);
 
 protected:
+  StockFetcher() {}
+
+protected:
   std::string stockCode;
   static size_t writeCallback(void *contents, size_t size, size_t nmemb,
                               std::string *s);
@@ -52,6 +55,7 @@ protected:
   std::string gbk2utf8(std::string_view in);
   virtual std::optional<StockInfo> parseReturnInfo(std::string_view info,
                                                    std::string *name) = 0;
+  void setUrl(QUrl url) { request.setUrl(url); }
 
 private:
   std::string fetch();

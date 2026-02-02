@@ -8,13 +8,14 @@
 
 #include "logger.h"
 #include "stock_fetcher.h"
+#include "utils.h"
 
 #include <QNetworkRequest>
 #include <QString>
 #include <QUrl>
 
 // Construct API request URL with target stock code
-static QNetworkRequest getRequset(const std::string &stockCode) {
+static QNetworkRequest getRequest(const std::string &stockCode) {
   QUrl url(QString::fromStdString("http://hq.sinajs.cn/list=" + stockCode));
   if (!url.isValid()) {
     LOG(ERROR) << "Invalid URL: " << stockCode;
@@ -32,7 +33,7 @@ static QNetworkRequest getRequset(const std::string &stockCode) {
 
 class SinaStockFetcher final : public NetworkFetcher {
 public:
-  SinaStockFetcher(std::string code) : NetworkFetcher(code, getRequset(code)) {}
+  SinaStockFetcher(std::string code) : NetworkFetcher(code, getRequest(code)) {}
   ~SinaStockFetcher() = default;
 
   static bool regist;
@@ -40,29 +41,7 @@ public:
 private:
   std::optional<StockInfo> parseReturnInfo(std::string_view info,
                                            std::string *name) override;
-
-  // Splits string into tokens using specified delimiter
-  std::vector<std::string_view> split(std::string_view s, char delimiter);
 };
-
-std::vector<std::string_view> SinaStockFetcher::split(std::string_view s,
-                                                      char delimiter) {
-  std::vector<std::string_view> tokens;
-  size_t start = 0;
-  size_t end = s.find(delimiter);
-
-  while (end != std::string_view::npos) {
-    tokens.emplace_back(s.substr(start, end - start));
-    start = end + 1;
-    end = s.find(delimiter, start);
-  }
-
-  if (start < s.size()) {
-    tokens.emplace_back(s.substr(start));
-  }
-
-  return tokens;
-}
 
 std::optional<StockInfo>
 SinaStockFetcher::parseReturnInfo(std::string_view response_data,
@@ -74,7 +53,7 @@ SinaStockFetcher::parseReturnInfo(std::string_view response_data,
   size_t end = response_data.find('"', start + 1);
   if (start != std::string_view::npos && end != std::string_view::npos) {
     auto stock_data = response_data.substr(start + 1, end - start - 1);
-    auto fields = split(stock_data, ',');
+    auto fields = splitString(stock_data, ',');
 
     std::array<double, 8> infos;
     if (fields.size() >= 8) {

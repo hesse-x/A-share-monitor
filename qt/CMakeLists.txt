@@ -40,6 +40,7 @@ set(SOURCES
     widget.cpp
     stock.cpp
     logger.cpp
+    utils.cpp
     config_parser.cpp
     config_dialog.cpp
     config_dialog.ui

@@ -50,7 +50,7 @@ void Stock::fetchLatestData() {
   if (!isTradingTime()) {
     return;
   }
-  auto newData = dataFetcher->fetchData();
+  auto newData = dataFetcher->fetchData(&name);
   if (!newData.has_value()) { // Add empty check
     return;
   }
