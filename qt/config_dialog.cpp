@@ -1,10 +1,11 @@
 #include <algorithm>
-#include <cctype>
 #include <cstddef>
 #include <memory>
+#include <optional>
 
 #include "config_dialog.h"
 #include "ui_config_dialog.h"
+#include "utils.h"
 
 #include <QInputDialog>
 #include <QLineEdit>
@@ -54,36 +55,10 @@ void ConfigDialog::on_addButton_clicked() {
       QLineEdit::Normal, "", &ok);
   if (ok && !code.isEmpty()) {
     std::string codeStr = code.trimmed().toStdString();
-    bool valid = true;
-    QString errorMsg;
-
-    // Validation 1: Length must be 8 characters
-    if (codeStr.size() != 8) {
-      valid = false;
-      errorMsg = "Code length must be 8 characters (e.g., sh600000)";
-    }
-    // Validation 2: First two characters must be 'sh' (Shanghai) or 'sz'
-    // (Shenzhen)
-    else if (codeStr.substr(0, 2) != "sh" && codeStr.substr(0, 2) != "sz") {
-      valid = false;
-      errorMsg =
-          "First two characters must be 'sh' (Shanghai) or 'sz' (Shenzhen)";
-    }
-    // Validation 3: Last six characters must be digits
-    else {
-      std::string numPart = codeStr.substr(2, 6);
-      for (char c : numPart) {
-        if (!isdigit(c)) { // Check if it's a digit
-          valid = false;
-          errorMsg = "Last six characters must be digits (0-9)";
-          break;
-        }
-      }
-    }
-
-    // Show error message if validation fails
-    if (!valid) {
-      QMessageBox::warning(this, "Format Error", errorMsg);
+    auto errMsg = checkCode(codeStr);
+    if (errMsg) {
+      QMessageBox::warning(this, "Format Error",
+                           QString().fromStdString(*errMsg));
       return;
     }
 

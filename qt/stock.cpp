@@ -6,6 +6,7 @@
 #include "logger.h"
 #include "stock.h"
 #include "stock_fetcher.h"
+#include "utils.h"
 
 #include <QDateTime>
 #include <QInternal>
@@ -14,9 +15,12 @@ Stock::Stock(std::string stock_code) : baseData(0.0) {
   if (stock_code.starts_with("test")) {
     dataFetcher = std::unique_ptr<StockFetcher>(
         StockFetcher::create(StockFetcher::Type::kRandom, stock_code));
-  } else {
+  } else if (isStock(stock_code)) {
     dataFetcher = std::unique_ptr<StockFetcher>(
         StockFetcher::create(StockFetcher::Type::kSina, stock_code));
+  } else if (isFuture(stock_code)) {
+    dataFetcher = std::unique_ptr<StockFetcher>(StockFetcher::create(
+        StockFetcher::Type::kSinaBackwardation, stock_code));
   }
   auto newData = dataFetcher->fetchData(&name);
   if (!newData.has_value()) {

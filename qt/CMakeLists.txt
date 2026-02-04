@@ -38,27 +38,35 @@ set(CMAKE_AUTOUIC ON)
 set(SOURCES
     main.cpp
     widget.cpp
-    stock.cpp
-    logger.cpp
-    utils.cpp
     config_parser.cpp
     config_dialog.cpp
     config_dialog.ui
-# stock fetcher
-    stock_fetcher.cpp
-    sina_fetcher.cpp
-    random_fetcher.cpp
 # display strategy
     display_mode.cpp
     line_chart_mode.cpp
     data_only_mode.cpp
 )
 
+add_library(Utils OBJECT
+    logger.cpp
+    utils.cpp
+)
+
+add_library(Stock OBJECT
+# stock fetcher
+    stock_fetcher.cpp
+    sina_fetcher.cpp
+    future_fetcher.cpp
+    random_fetcher.cpp
+    stock.cpp
+)
+target_link_libraries(Stock PRIVATE ${QT_LIBRARIES} Utils)
+
 # Create executable
 add_executable(StockMonitor ${SOURCES})
 
 # Link Qt libraries
-target_link_libraries(StockMonitor PRIVATE ${QT_LIBRARIES})
+target_link_libraries(StockMonitor PRIVATE ${QT_LIBRARIES} Utils Stock)
 
 # Set as GUI application on Windows (no console window)
 if(WIN32)

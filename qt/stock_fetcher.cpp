@@ -75,5 +75,8 @@ std::string NetworkFetcher::gbk2utf8(std::string_view in) {
 }
 
 StockFetcher *StockFetcher::create(Type type, std::string stockCode) {
-  return creators[static_cast<int>(type)](stockCode);
-};
+  const auto &fn = creators[static_cast<int>(type)];
+  if (!fn)
+    LOG(FATAL) << "Invalid creator type";
+  return fn(stockCode);
+}

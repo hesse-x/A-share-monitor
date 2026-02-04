@@ -8,6 +8,7 @@
 #include <string_view>
 
 #include <QNetworkRequest>
+#include <QUrl>
 
 struct StockInfo {
   double curPrice;
@@ -20,10 +21,11 @@ public:
   enum class Type : int {
     kRandom = 0,
     kSina = 1,
+    kSinaBackwardation = 2,
     kNum,
   };
   // Constructor: Initialize stock code
-  explicit StockFetcher(std::string stockCode) : stockCode(stockCode) {}
+  explicit StockFetcher(std::string_view stockCode) : stockCode(stockCode) {}
   virtual ~StockFetcher() = default;
 
   // Fetch stock data once, return stock price
@@ -49,7 +51,7 @@ public:
   virtual ~NetworkFetcher() = default;
 
 protected:
-  NetworkFetcher(std::string code, QNetworkRequest request)
+  NetworkFetcher(std::string_view code, QNetworkRequest request)
       : StockFetcher(code), request(request) {}
   // Converts GBK encoded string to UTF-8
   std::string gbk2utf8(std::string_view in);
