@@ -1,6 +1,7 @@
 #include <array>
 #include <new>
 #include <ostream>
+#include <stdexcept>
 #include <string>
 #include <utility>
 
@@ -51,7 +52,8 @@ std::string NetworkFetcher::fetch() {
   if (reply->error() == QNetworkReply::NoError) {
     response_data = reply->readAll().toStdString();
   } else {
-    LOG(ERROR) << "Request failed: " << reply->errorString().toStdString();
+    throw std::runtime_error(std::string("Request failed: ")
+                                 .append(reply->errorString().toStdString()));
   }
 
   // Clean up network resources
@@ -59,12 +61,12 @@ std::string NetworkFetcher::fetch() {
   return response_data;
 }
 
-std::optional<StockInfo> NetworkFetcher::fetchData(std::string *name) {
+StockInfo NetworkFetcher::fetchData() {
   auto result = fetch();
-  return parseReturnInfo(result, name);
+  return parseReturnInfo(result);
 }
 
-std::string NetworkFetcher::gbk2utf8(std::string_view in) {
+std::string gbk2utf8(std::string_view in) {
   QByteArray gbkData(std::string(in).c_str(), in.size());
   QTextCodec *gbkCodec = QTextCodec::codecForName("GBK");
   if (!gbkCodec) {

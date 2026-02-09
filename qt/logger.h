@@ -20,3 +20,9 @@ public:
       << std::filesystem::path(__FILE__).filename().c_str() << "(" << __LINE__ \
       << "):"
 #endif // LOGGER_H
+
+#define DBG()                                                                  \
+  Logger(LogLevel::DEBUG)                                                      \
+      << "[" << (DEBUG_TYPE) << "]"                                            \
+      << std::filesystem::path(__FILE__).filename().c_str() << "(" << __LINE__ \
+      << "):"

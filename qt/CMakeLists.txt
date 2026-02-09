@@ -8,6 +8,38 @@ set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 add_compile_options(-Wall -Wextra -Werror -Wno-unused-parameter)
 
+set(SANITIZER "" CACHE STRING "启用的Sanitizer类型，逗号分隔：addr(地址)/thread(线程)/ub(未定义行为)")
+if(SANITIZER)
+    # 仅支持GCC/Clang（MSVC Sanitizer参数不同，需单独适配）
+    if(NOT (CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang"))
+        message(FATAL_ERROR "Sanitizer仅支持GCC/Clang编译器！当前编译器：${CMAKE_CXX_COMPILER_ID}")
+    endif()
+
+    # 拆分逗号分隔的Sanitizer列表
+    string(REPLACE "," ";" SANITIZER_LIST ${SANITIZER})
+    # 去重（避免用户重复传参，如 -DSANITIZER=addr,addr）
+    list(REMOVE_DUPLICATES SANITIZER_LIST)
+
+    # 定义Sanitizer映射表：类型 -> 编译/链接标志
+    set(SANITIZER_FLAGS_MAP
+        "addr;address"
+        "thread;thread"
+        "ub;undefined"
+    )
+# string(SANITIZER_FLAG_STR "address,undefined")
+    add_compile_options(
+        -fsanitize=address,undefined    # 启用指定Sanitizer
+        -g                                   # 生成调试信息（必须，否则无行号）
+        -O1                                  # 低优化（O2/O3会掩盖错误，O0也可）
+        -fno-omit-frame-pointer              # 保留栈帧，显示完整调用栈
+    )
+    add_link_options(
+        -fsanitize=address,undefined
+    )
+
+
+endif()
+
 # Flag to mark if Qt is found
 set(QT_FOUND FALSE)
 

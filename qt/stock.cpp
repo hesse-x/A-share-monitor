@@ -1,6 +1,6 @@
 #include <algorithm>
 #include <cstddef>
-#include <optional>
+#include <exception>
 #include <ostream>
 
 #include "logger.h"
@@ -22,12 +22,16 @@ Stock::Stock(std::string stock_code) : baseData(0.0) {
     dataFetcher = std::unique_ptr<StockFetcher>(StockFetcher::create(
         StockFetcher::Type::kSinaBackwardation, stock_code));
   }
-  auto newData = dataFetcher->fetchData(&name);
-  if (!newData.has_value()) {
-    LOG(ERROR) << "fetch data failed, stock_code: " << stock_code;
+  try {
+    auto newData = dataFetcher->fetchData();
+    name = newData.name;
+    baseData = newData.yesterdayPrice;
+    historyData.push_back(historyData.capacity(), newData.curPrice);
+  } catch (const std::exception &e) {
+    LOG(ERROR) << "Fetch data failed, stock_code: " << stock_code
+               << ", detail error inf: " << e.what();
+    return;
   }
-  baseData = newData->yesterdayPrice;
-  historyData.push_back(historyData.capacity(), newData->curPrice);
 }
 
 // Check if current time is within trading hours
@@ -54,13 +58,12 @@ void Stock::fetchLatestData() {
   if (!isTradingTime()) {
     return;
   }
-  auto newData = dataFetcher->fetchData(&name);
-  if (!newData.has_value()) { // Add empty check
-    return;
-  }
-  if (newData->yesterdayPrice != baseData)
-    baseData = newData->yesterdayPrice;
-  historyData.push_back(newData->curPrice);
+  auto newData = dataFetcher->fetchData();
+
+  name = newData.name;
+  if (newData.yesterdayPrice != baseData)
+    baseData = newData.yesterdayPrice;
+  historyData.push_back(newData.curPrice);
 }
 
 std::pair<double, double> Stock::getBound() const {

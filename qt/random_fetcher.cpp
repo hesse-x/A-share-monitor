@@ -1,4 +1,3 @@
-#include <optional>
 #include <random>
 #include <string>
 
@@ -26,7 +25,7 @@ public:
   }
   ~RandomStockFetcher() = default;
 
-  std::optional<StockInfo> fetchData(std::string *name) override;
+  StockInfo fetchData() override;
 
   static bool regist;
 
@@ -37,12 +36,10 @@ private:
 };
 
 // Core method: Fetch data once and return fields 1-7
-std::optional<StockInfo> RandomStockFetcher::fetchData(std::string *name) {
+StockInfo RandomStockFetcher::fetchData() {
   curPrice = genNextVal(curPrice);
-  if (name) {
-    *name = "random";
-  }
-  return StockInfo{.curPrice = curPrice,
+  return StockInfo{.name = "random",
+                   .curPrice = curPrice,
                    .yesterdayPrice = yesterdayPrice,
                    .openPrice = openPrice};
 }

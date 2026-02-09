@@ -4,6 +4,9 @@
 
 #include "config_parser.h"
 #include "logger.h"
+
+#define DEBUG_TYPE "config-parser"
+
 static bool isComment(std::string_view str) {
   return str.size() > 0 && str.front() == '#';
 }
@@ -106,13 +109,13 @@ std::optional<ConfigData> parseConfig(std::istream &ins) {
       if (trimmed == "freq:") {
         state = State::READ_FREQ;
       } else {
-        LOG(INFO) << "parse code: " << trimmed;
+        DBG() << "parse code: " << trimmed;
         result.codes.emplace_back(trimmed);
       }
       break;
 
     case State::READ_FREQ:
-      LOG(INFO) << "parse freq: " << trimmed;
+      DBG() << "parse freq: " << trimmed;
       int64_t time = parseTime(trimmed);
       if (time == -1) {
         LOG(ERROR) << "Parse config failed(line: " << line_num
