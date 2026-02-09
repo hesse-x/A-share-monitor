@@ -3,7 +3,6 @@
 
 #include <cstddef>
 #include <functional>
-#include <optional>
 #include <string>
 #include <string_view>
 
@@ -11,6 +10,7 @@
 #include <QUrl>
 
 struct StockInfo {
+  std::string name;
   double curPrice;
   double yesterdayPrice;
   double openPrice;
@@ -29,7 +29,7 @@ public:
   virtual ~StockFetcher() = default;
 
   // Fetch stock data once, return stock price
-  virtual std::optional<StockInfo> fetchData(std::string *name = nullptr) = 0;
+  virtual StockInfo fetchData() = 0;
   const std::string &getCode() const { return stockCode; }
 
   static StockFetcher *create(Type type, std::string stockCode);
@@ -47,20 +47,20 @@ protected:
 
 class NetworkFetcher : public StockFetcher {
 public:
-  std::optional<StockInfo> fetchData(std::string *name) override final;
+  StockInfo fetchData() override final;
   virtual ~NetworkFetcher() = default;
+  void setUrl(QUrl url) { request.setUrl(url); }
 
 protected:
   NetworkFetcher(std::string_view code, QNetworkRequest request)
       : StockFetcher(code), request(request) {}
   // Converts GBK encoded string to UTF-8
-  std::string gbk2utf8(std::string_view in);
-  virtual std::optional<StockInfo> parseReturnInfo(std::string_view info,
-                                                   std::string *name) = 0;
-  void setUrl(QUrl url) { request.setUrl(url); }
+  virtual StockInfo parseReturnInfo(std::string_view info) = 0;
 
 private:
   std::string fetch();
   QNetworkRequest request;
 };
+
+std::string gbk2utf8(std::string_view in);
 #endif // STOCK_FETCHER_H

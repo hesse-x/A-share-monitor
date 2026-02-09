@@ -1,7 +1,7 @@
 #include <algorithm>
 #include <cstddef>
+#include <exception>
 #include <memory>
-#include <optional>
 
 #include "config_dialog.h"
 #include "ui_config_dialog.h"
@@ -55,10 +55,11 @@ void ConfigDialog::on_addButton_clicked() {
       QLineEdit::Normal, "", &ok);
   if (ok && !code.isEmpty()) {
     std::string codeStr = code.trimmed().toStdString();
-    auto errMsg = checkCode(codeStr);
-    if (errMsg) {
+    try {
+      checkCode(codeStr);
+    } catch (const std::exception &e) {
       QMessageBox::warning(this, "Format Error",
-                           QString().fromStdString(*errMsg));
+                           QString().fromStdString(e.what()));
       return;
     }
 

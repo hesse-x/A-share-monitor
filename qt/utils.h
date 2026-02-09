@@ -1,5 +1,5 @@
-#include <optional>
-#include <string>
+#ifndef UTILS_H
+#define UTILS_H
 #include <string_view>
 #include <vector>
 
@@ -14,4 +14,6 @@ inline static bool isFuture(std::string_view code) {
          code.starts_with("IC") || code.starts_with("IM");
 }
 
-std::optional<std::string> checkCode(std::string_view code);
+void checkCode(std::string_view code);
+
+#endif // UITLS_H

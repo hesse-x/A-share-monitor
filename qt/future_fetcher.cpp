@@ -1,25 +1,18 @@
-#include <array>
 #include <cassert>
 #include <cstdio>
-#include <cstdlib>
 #include <map>
 #include <memory>
-#include <optional>
 #include <ostream>
 #include <string>
 #include <string_view>
 #include <tuple>
 #include <utility>
-#include <vector>
 
 #include "logger.h"
+#include "sina_fetcher.h"
 #include "stock_fetcher.h"
-#include "utils.h"
 
 #include <QDateTime>
-#include <QNetworkRequest>
-#include <QString>
-#include <QUrl>
 
 static const std::map<std::string_view, std::string> kNameMap{
     {"IH", "sh000922"},
@@ -28,7 +21,19 @@ static const std::map<std::string_view, std::string> kNameMap{
     {"IM", "sh000852"},
 };
 
-class SinaFutureFetcher : public NetworkFetcher {
+static std::pair<int, int> getNearestDate() {
+  const QDate date = QDate::currentDate();
+  int currentYear = date.year() % 100;
+  int currentMonth = date.month();
+
+  int remainder = currentMonth % 3;
+  if (remainder != 0) {
+    currentMonth = currentMonth + (3 - remainder);
+  }
+  return {currentYear, currentMonth};
+}
+
+class SinaFutureFetcher : public SinaFetcher {
 public:
   enum class Type : int {
     kFront = 0,
@@ -41,8 +46,13 @@ public:
   const std::string &getContract() const { return futureCode; }
 
 private:
-  std::optional<StockInfo> parseReturnInfo(std::string_view info,
-                                           std::string *name) override;
+  int getNameIdx() const override final { return -1; }
+
+  int getCurPriceIdx() const override final { return 3; }
+
+  int getYesterdayPriceIdx() const override final { return 0; }
+
+  int getOpenPriceIdx() const override final { return 0; }
 
 private:
   Type type;
@@ -51,6 +61,7 @@ private:
 
 static std::tuple<std::string, SinaFutureFetcher::Type>
 parseCode(std::string_view code) {
+  assert(code.size() > 3 && "Invalid future code");
   std::string_view name(code.data(), 2);
   std::string_view typeStr = code.substr(3);
   if (typeStr == "Front")
@@ -59,7 +70,8 @@ parseCode(std::string_view code) {
   if (typeStr == "Next")
     return std::tuple<std::string, SinaFutureFetcher::Type>{
         name, SinaFutureFetcher::Type::kNext};
-  return std::tuple<std::string, SinaFutureFetcher::Type>();
+  LOG(FATAL) << "Invalid future code";
+  __builtin_unreachable();
 }
 
 class SinaBackwardationFetcher : public StockFetcher {
@@ -72,7 +84,7 @@ public:
         StockFetcher::create(StockFetcher::Type::kSina, it->second));
     future = std::make_unique<SinaFutureFetcher>(it->first, type);
   }
-  std::optional<StockInfo> fetchData(std::string *name) override final;
+  StockInfo fetchData() override final;
   virtual ~SinaBackwardationFetcher() = default;
   static bool regist;
 
@@ -80,19 +92,6 @@ private:
   std::unique_ptr<StockFetcher> spot;
   std::unique_ptr<SinaFutureFetcher> future;
 };
-
-static std::pair<int, int> getNearestDate() {
-  const QDate date = QDate::currentDate();
-  // 1. 提取指定日期的年份和月份
-  int currentYear = date.year() % 100;
-  int currentMonth = date.month();
-
-  int remainder = currentMonth % 3; // 计算月份除以3的余数（0、1、2）
-  if (remainder != 0) {
-    currentMonth = currentMonth + (3 - remainder);
-  }
-  return {currentYear, currentMonth};
-}
 
 static std::string getContractCode(std::string_view name,
                                    SinaFutureFetcher::Type type) {
@@ -105,98 +104,29 @@ static std::string getContractCode(std::string_view name,
     year += 1;
     month = month % 12;
   }
-  std::string ret(name);
-  ret.append(4, '0');
-  snprintf(ret.data() + 2, sizeof(ret.size() - 2), "%02d%02d", year, month);
+  std::string ret(7, '\0');
+  snprintf(ret.data(), ret.size(), "%2s%02d%02d", name.data(), year, month);
+  ret.pop_back();
   return ret;
 }
 
-static QUrl getUrl(const std::string &code) {
-  return QUrl(QString::fromStdString("http://hq.sinajs.cn/list=nf_" + code));
-}
-
-static QNetworkRequest getRequest(const std::string &stockCode) {
-  QUrl url = getUrl(stockCode);
-  if (!url.isValid()) {
-    LOG(ERROR) << "Invalid URL: " << stockCode;
-  }
-
-  QNetworkRequest request(url);
-  request.setRawHeader("Referer", "https://finance.sina.com.cn/");
-  request.setRawHeader("User-Agent",
-                       "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
-                       "AppleWebKit/537.36 (KHTML, like Gecko) "
-                       "Chrome/120.0.0.0 Safari/537.36");
-  request.setRawHeader("Upgrade-Insecure-Requests", "1");
-  return request;
-}
-
 SinaFutureFetcher::SinaFutureFetcher(std::string_view name, Type fetchType)
-    : NetworkFetcher(name, getRequest(getContractCode(name, fetchType))),
+    : SinaFetcher(getContractCode(name, fetchType)),
       futureCode(getContractCode(name, fetchType)){};
 
 void SinaFutureFetcher::updateContract() {
   auto newCode = getContractCode(getCode(), type);
-  setUrl(getUrl(newCode));
+  setUrl(getUrl(newCode, "nf_"));
 }
 
-std::optional<StockInfo>
-SinaFutureFetcher::parseReturnInfo(std::string_view response_data,
-                                   std::string *name) {
-  std::optional<StockInfo> result = std::nullopt;
-
-  // Extract data between quotation marks from API response
-  size_t start = response_data.find('"');
-  size_t end = response_data.find('"', start + 1);
-  if (start != std::string_view::npos && end != std::string_view::npos) {
-    auto stock_data = response_data.substr(start + 1, end - start - 1);
-    auto fields = splitString(stock_data, ',');
-
-    std::array<double, 8> infos;
-    if (fields.size() >= 5) {
-      // Parse numerical values from response fields
-      for (int i = 0; i < 5; ++i) {
-        auto sv = fields[i];
-        const char *start = sv.data();
-        const char *end = start + sv.size();
-        char *cvtEnd;
-        infos[i] = strtod(start, &cvtEnd);
-        if (cvtEnd != end)
-          LOG(ERROR) << "invalid price format: " << sv;
-      }
-
-      LOG(INFO) << gbk2utf8(
-          fields[0]); // Log stock name after encoding conversion
-      if (name)
-        *name = gbk2utf8(fields.back());
-      // Populate result with required stock information
-      result = StockInfo{.curPrice = infos[3],
-                         .yesterdayPrice = infos[0],
-                         .openPrice = infos[0]};
-    } else {
-      LOG(ERROR) << "Data format error, insufficient fields, stock code: "
-                 << stockCode;
-    }
-  } else {
-    LOG(ERROR) << "Failed to parse response data";
-  }
-  return result;
-}
-
-std::optional<StockInfo>
-SinaBackwardationFetcher::fetchData(std::string *name) {
-  auto spotPrice = spot->fetchData(nullptr);
-  if (!spotPrice)
-    return std::nullopt;
+StockInfo SinaBackwardationFetcher::fetchData() {
+  auto spotPrice = spot->fetchData();
   future->updateContract();
-  auto futurePrice = future->fetchData(nullptr);
-  if (!futurePrice)
-    return std::nullopt;
-  if (name)
-    *name = future->getContract();
-  return StockInfo{.curPrice = futurePrice->curPrice,
-                   .yesterdayPrice = spotPrice->curPrice,
-                   .openPrice = spotPrice->curPrice};
+  auto futurePrice = future->fetchData();
+  return StockInfo{.name = future->getContract(),
+                   .curPrice = futurePrice.curPrice,
+                   .yesterdayPrice = spotPrice.curPrice,
+                   .openPrice = spotPrice.curPrice};
 }
 
 // Register factory method for SinaBackwardationFetcher
