@@ -19,3 +19,8 @@ iwyu_tool.py -p  . -- -Xiwyu --mapping_file=../iwyu.imp
 ```shell
 cmake -DCMAKE_EXPORT_COMPILE_COMMANDS=ON -DCMAKE_BUILD_TYPE=Debug -DSANITIZER=addr,ub ../
 ```
+
+```cross compile
+export QT_CROSS_WIN=/home/cambricon/qt5-win64-cross
+cmake ../ -DCMAKE_TOOLCHAIN_FILE=cmake/mingw64-win32.cmake
+```

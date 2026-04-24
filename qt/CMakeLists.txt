@@ -40,8 +40,19 @@ if(SANITIZER)
 
 endif()
 
+# 交叉编译时使用静态链接
+if(CMAKE_CROSSCOMPILING)
+    set(CMAKE_EXE_LINKER_FLAGS "-static -no-pie")
+endif()
+
 # Flag to mark if Qt is found
 set(QT_FOUND FALSE)
+
+# 设置交叉编译时的Qt路径
+if(CMAKE_CROSSCOMPILING AND DEFINED ENV{QT_CROSS_WIN})
+    set(CMAKE_PREFIX_PATH $ENV{QT_CROSS_WIN})
+    message(STATUS "交叉编译模式，使用Qt路径: ${CMAKE_PREFIX_PATH}")
+endif()
 
 # 1. First try to find Qt6
 find_package(Qt6 COMPONENTS Core Gui Widgets Network QUIET)
