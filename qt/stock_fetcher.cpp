@@ -14,7 +14,7 @@
 #include <QNetworkReply>
 #include <QObject>
 #include <QString>
-#include <QTextCodec>
+#include <QStringConverter>
 
 // Callback function: Save response data
 size_t StockFetcher::writeCallback(void *contents, size_t size, size_t nmemb,
@@ -67,12 +67,11 @@ StockInfo NetworkFetcher::fetchData() {
 }
 
 std::string gbk2utf8(std::string_view in) {
-  QByteArray gbkData(std::string(in).c_str(), in.size());
-  QTextCodec *gbkCodec = QTextCodec::codecForName("GBK");
-  if (!gbkCodec) {
-    return "";
-  }
-  QString unicodeStr = gbkCodec->toUnicode(gbkData);
+  QByteArray gbkData(in.data(), in.size());
+  QStringDecoder gbkDecoder("GBK");
+  if (!gbkDecoder.isValid())
+      return "";
+  QString unicodeStr = gbkDecoder(gbkData);
   return unicodeStr.toUtf8().toStdString();
 }
 

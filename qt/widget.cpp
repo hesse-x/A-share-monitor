@@ -17,7 +17,6 @@
 #include <QPainter>
 #include <QtGlobal>
 
-#ifdef QT6_OR_NEWER
 static inline std::pair<int, int> getDesktopSize() {
   QScreen *primaryScreen = QGuiApplication::primaryScreen();
   QRect rect = primaryScreen->geometry();
@@ -25,15 +24,6 @@ static inline std::pair<int, int> getDesktopSize() {
   int screenHeight = rect.height();
   return {screenWidth, screenHeight};
 }
-#else
-#include <QDesktopWidget>
-static inline std::pair<int, int> getDesktopSize() {
-  QDesktopWidget *desktop = QApplication::desktop();
-  int screenWidth = desktop->width();
-  int screenHeight = desktop->height();
-  return {screenWidth, screenHeight};
-}
-#endif
 
 Widget::RollingDisplayState::RollingDisplayState() {}
 Widget::RollingDisplayState::RollingDisplayState(

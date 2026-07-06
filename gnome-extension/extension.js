@@ -1,16 +1,13 @@
-const St = imports.gi.St;
-const Main = imports.ui.main;
-const PanelMenu = imports.ui.panelMenu;
-const ExtensionUtils = imports.misc.extensionUtils;
-const GLib = imports.gi.GLib;
-const Gio = imports.gi.Gio;
-const ByteArray = imports.byteArray;
+import St from 'gi://St';
+import GLib from 'gi://GLib';
+import Gio from 'gi://Gio';
 
-let indicator, line1, line2, updateInterval;
+import * as Main from 'resource:///org/gnome/shell/ui/main.js';
+import * as PanelMenu from 'resource:///org/gnome/shell/ui/panelMenu.js';
+
+import {Extension} from 'resource:///org/gnome/shell/extensions/extension.js';
+
 const STOCK_CODE = 'sh688256';
-let cachedData = null;
-let lastFetchTime = 0;
-let isInTradingPeriod = false;
 
 function isInTradingHours() {
     const now = new Date();
@@ -82,92 +79,111 @@ function addSign(value) {
     return value >= 0 ? `+${value}` : `${value}`;
 }
 
-// Parse and update display
-function updateDisplayWithData(data) {
-    if (!data || data.length < 4) {
-        line1.set_text('Data error');
-        line2.set_text('---');
-        return;
+export default class StockTickerExtension extends Extension {
+    constructor(metadata) {
+        super(metadata);
+        this._indicator = null;
+        this._line1 = null;
+        this._line2 = null;
+        this._updateInterval = null;
+        this._cachedData = null;
+        this._lastFetchTime = 0;
+        this._isInTradingPeriod = false;
     }
 
-    const currentPrice = parseFloat(data[3]);
-    const preClosePrice = parseFloat(data[2]);
-    const change = currentPrice - preClosePrice;
-    const percentage = ((change / preClosePrice) * 100).toFixed(2);
-    const color = change < 0 ? "#00ff00" : "#ff0000";
-    const style = `color: ${color}; text-align: center; font-size: 12px; font-weight: bold; padding: 0; line-height: 1.0;`;
-
-    line1.set_text(`${currentPrice.toFixed(2)}(${addSign(change.toFixed(2))})`);
-    line2.set_text(`${addSign(percentage)}%`);
-    line1.style = style;
-    line2.style = style;
-}
-
-function fetchAndUpdateData() {
-    const data = getSinaStockPrice(STOCK_CODE);
-    cachedData = data;
-    lastFetchTime = Date.now();
-    updateDisplayWithData(data);
-}
-
-async function updateDisplay() {
-    try {
-        const currentTradingStatus = isInTradingHours();
-
-        if (currentTradingStatus !== isInTradingPeriod) {
-            isInTradingPeriod = currentTradingStatus;
-            log(`[GJS] Trading status changed: ${isInTradingPeriod ? 'Entering trading hours' : 'Entering non-trading hours'}`);
-            fetchAndUpdateData();
-        } else if (currentTradingStatus) {
-            fetchAndUpdateData();
-        } else {
-            if (cachedData) {
-                updateDisplayWithData(cachedData);
-            } else {
-                fetchAndUpdateData();
-            }
-            log(`[GJS] Non-trading hours, using cached data (last updated: ${new Date(lastFetchTime).toLocaleTimeString()})`);
+    // Parse and update display
+    _updateDisplayWithData(data) {
+        if (!data || data.length < 4) {
+            this._line1.set_text('Data error');
+            this._line2.set_text('---');
+            return;
         }
-    } catch (e) {
-        log(`Error: ${e.message}`);
-        line1.set_text('Fetch failed');
-        line2.set_text('---');
+
+        const currentPrice = parseFloat(data[3]);
+        const preClosePrice = parseFloat(data[2]);
+        const change = currentPrice - preClosePrice;
+        const percentage = ((change / preClosePrice) * 100).toFixed(2);
+        const color = change < 0 ? "#00ff00" : "#ff0000";
+        const style = `color: ${color}; text-align: center; font-size: 12px; font-weight: bold; padding: 0; line-height: 1.0;`;
+
+        this._line1.set_text(`${currentPrice.toFixed(2)}(${addSign(change.toFixed(2))})`);
+        this._line2.set_text(`${addSign(percentage)}%`);
+        this._line1.style = style;
+        this._line2.style = style;
     }
-}
 
-function init() {}
+    _fetchAndUpdateData() {
+        const data = getSinaStockPrice(STOCK_CODE);
+        this._cachedData = data;
+        this._lastFetchTime = Date.now();
+        this._updateDisplayWithData(data);
+    }
 
-function enable() {
-    indicator = new PanelMenu.Button(0.0);
-    
-    const container = new St.BoxLayout({
-        vertical: true,
-        style: "horizontal-align: center; padding: 1px 3px; min-width: 80px;"
-    });
-    
-    line1 = new St.Label({ text: "0.00(+0.00)", style: "color: #ff0000; text-align: center; font-size: 12px; font-weight: bold; padding: 0; line-height: 1.0;" });
-    line2 = new St.Label({ text: "+0.00%", style: "color: #ff0000; text-align: center; font-size: 12px; font-weight: bold; padding: 0; line-height: 1.0;" });
-    
-    container.add_child(line1);
-    container.add_child(line2);
-    indicator.add_child(container);
-    
-    Main.panel.addToStatusArea("stock-ticker", indicator, 0, "right");
-    
-    // Initialize status check
-    isInTradingPeriod = isInTradingHours();
-    updateDisplay();
-    
-    // Check every 30 seconds (updates data during trading hours, only checks status during non-trading hours)
-    updateInterval = GLib.timeout_add_seconds(
-        GLib.PRIORITY_DEFAULT,
-        30,
-        () => { updateDisplay(); return true; }
-    );
-}
+    _updateDisplay() {
+        try {
+            const currentTradingStatus = isInTradingHours();
 
-function disable() {
-    if (updateInterval) GLib.source_remove(updateInterval);
-    if (indicator) indicator.destroy();
-    indicator = line1 = line2 = updateInterval = cachedData = null;
+            if (currentTradingStatus !== this._isInTradingPeriod) {
+                this._isInTradingPeriod = currentTradingStatus;
+                log(`[GJS] Trading status changed: ${this._isInTradingPeriod ? 'Entering trading hours' : 'Entering non-trading hours'}`);
+                this._fetchAndUpdateData();
+            } else if (currentTradingStatus) {
+                this._fetchAndUpdateData();
+            } else {
+                if (this._cachedData) {
+                    this._updateDisplayWithData(this._cachedData);
+                } else {
+                    this._fetchAndUpdateData();
+                }
+                log(`[GJS] Non-trading hours, using cached data (last updated: ${new Date(this._lastFetchTime).toLocaleTimeString()})`);
+            }
+        } catch (e) {
+            log(`Error: ${e.message}`);
+            this._line1.set_text('Fetch failed');
+            this._line2.set_text('---');
+        }
+    }
+
+    enable() {
+        this._indicator = new PanelMenu.Button(0.0);
+
+        const container = new St.BoxLayout({
+            vertical: true,
+            style: "horizontal-align: center; padding: 1px 3px; min-width: 80px;"
+        });
+
+        this._line1 = new St.Label({ text: "0.00(+0.00)", style: "color: #ff0000; text-align: center; font-size: 12px; font-weight: bold; padding: 0; line-height: 1.0;" });
+        this._line2 = new St.Label({ text: "+0.00%", style: "color: #ff0000; text-align: center; font-size: 12px; font-weight: bold; padding: 0; line-height: 1.0;" });
+
+        container.add_child(this._line1);
+        container.add_child(this._line2);
+        this._indicator.add_child(container);
+
+        Main.panel.addToStatusArea("stock-ticker", this._indicator, 0, "right");
+
+        // Initialize status check
+        this._isInTradingPeriod = isInTradingHours();
+        this._updateDisplay();
+
+        // Check every 30 seconds (updates data during trading hours, only checks status during non-trading hours)
+        this._updateInterval = GLib.timeout_add_seconds(
+            GLib.PRIORITY_DEFAULT,
+            30,
+            () => { this._updateDisplay(); return true; }
+        );
+    }
+
+    disable() {
+        if (this._updateInterval) {
+            GLib.source_remove(this._updateInterval);
+            this._updateInterval = null;
+        }
+        if (this._indicator) {
+            this._indicator.destroy();
+            this._indicator = null;
+        }
+        this._line1 = null;
+        this._line2 = null;
+        this._cachedData = null;
+    }
 }
