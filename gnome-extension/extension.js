@@ -7,7 +7,20 @@ import * as PanelMenu from 'resource:///org/gnome/shell/ui/panelMenu.js';
 
 import {Extension} from 'resource:///org/gnome/shell/extensions/extension.js';
 
+// ByteArray bridges Uint8Array (what read_bytes_async yields in GJS 46+) and the
+// byte-string type GLib.convert expects. Without it, get_data() gets toString()'d
+// into "1,2,3,..." and the GBK→UTF8 decode silently produces garbage.
+const ByteArray = imports.byteArray;
+
 const STOCK_CODE = 'sh688256';
+const CONNECT_TIMEOUT_SEC = 5;
+const REQUEST_TIMEOUT_SEC = 8;
+
+// Wrap blocking Gio async methods into GJS Promises so we can `await` them
+// on the main loop without freezing the Shell while the socket I/O is in flight.
+Gio._promisify(Gio.SocketClient.prototype, 'connect_to_host_async', 'connect_to_host_finish');
+Gio._promisify(Gio.OutputStream.prototype, 'write_bytes_async', 'write_bytes_finish');
+Gio._promisify(Gio.InputStream.prototype, 'read_bytes_async', 'read_bytes_finish');
 
 function isInTradingHours() {
     const now = new Date();
@@ -27,49 +40,71 @@ function isInTradingHours() {
            (timeMinutes >= afternoonStart && timeMinutes <= afternoonEnd);
 }
 
-// Implementation using Gio 2.0 compatible SocketClient
-function getSinaStockPrice(stockCode) {
-    const host = "hq.sinajs.cn";
+// Fully async fetch: never blocks the GNOME Shell main loop.
+// Resolves to the parsed Sina quote fields, or rejects on error/timeout.
+async function getSinaStockPrice(stockCode) {
+    const host = 'hq.sinajs.cn';
     const port = 80;
     const client = new Gio.SocketClient();
+    client.set_timeout(CONNECT_TIMEOUT_SEC);
+
+    // Cancellable lets us abort if the read phase drags on too long.
+    const cancellable = new Gio.Cancellable();
     let connection = null;
+    let timeoutId = 0;
 
     try {
         log(`[GJS] Connecting to ${host}:${port}...`);
-        connection = client.connect_to_host(host, port, null);
-        if (!connection) {
-            throw new Error("Failed to establish connection");
-        }
+        connection = await client.connect_to_host_async(host, port, cancellable);
+        if (!connection)
+            throw new Error('Failed to establish connection');
+
+        // Arm a watchdog so a slow/dead server can't hold the loop open.
+        timeoutId = GLib.timeout_add_seconds(GLib.PRIORITY_DEFAULT, REQUEST_TIMEOUT_SEC, () => {
+            log(`[GJS] Request exceeded ${REQUEST_TIMEOUT_SEC}s, cancelling`);
+            cancellable.cancel();
+            return GLib.SOURCE_REMOVE;
+        });
 
         const request = `GET /list=${stockCode} HTTP/1.1\r\n` +
-                       `Host: ${host}\r\n` +
-                       `User-Agent: Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36\r\n` +
-                       `Referer: https://finance.sina.com.cn/\r\n` +
-                       `Connection: close\r\n\r\n`;
+                        `Host: ${host}\r\n` +
+                        `User-Agent: Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36\r\n` +
+                        `Referer: https://finance.sina.com.cn/\r\n` +
+                        `Connection: close\r\n\r\n`;
 
         log(`[GJS] Sending request: ${request.substring(0, Math.min(request.length, 50))}...`);
-        connection.get_output_stream().write_bytes(GLib.Bytes.new(request), null);
+        await connection.get_output_stream().write_bytes_async(
+            GLib.Bytes.new(request), GLib.PRIORITY_DEFAULT, cancellable);
 
         const inputStream = connection.get_input_stream();
         const bufferSize = 512;
         const chunks = [];
 
         while (true) {
-            let bytesRead = inputStream.read_bytes(bufferSize, null);
-            if (!bytesRead || bytesRead.get_size() === 0) break;
+            const bytesRead = await inputStream.read_bytes_async(
+                bufferSize, GLib.PRIORITY_DEFAULT, cancellable);
+            if (!bytesRead || bytesRead.get_size() === 0)
+                break;
 
-            chunks.push(GLib.convert(bytesRead.get_data(), "UTF8", "GBK"));
-            if (bytesRead.get_size() < bufferSize) break;
+            chunks.push(GLib.convert(ByteArray.fromUint8Array(bytesRead.get_data()), 'UTF8', 'GBK'));
+            if (bytesRead.get_size() < bufferSize)
+                break;
         }
 
-        return chunks.join("").split("\"")[1].split(",");
+        return chunks.join('').split('"')[1].split(',');
     } catch (e) {
         log(`[GJS Error] ${e.message}`);
         throw e;
     } finally {
+        if (timeoutId)
+            GLib.source_remove(timeoutId);
         if (connection) {
-            connection.close(null);
-            log("[GJS] Connection closed.");
+            try {
+                connection.close(null);
+                log('[GJS] Connection closed.');
+            } catch (e) {
+                // Closing an already-closed/cancelled connection is harmless.
+            }
         }
     }
 }
@@ -89,6 +124,7 @@ export default class StockTickerExtension extends Extension {
         this._cachedData = null;
         this._lastFetchTime = 0;
         this._isInTradingPeriod = false;
+        this._inFlight = false;
     }
 
     // Parse and update display
@@ -103,7 +139,7 @@ export default class StockTickerExtension extends Extension {
         const preClosePrice = parseFloat(data[2]);
         const change = currentPrice - preClosePrice;
         const percentage = ((change / preClosePrice) * 100).toFixed(2);
-        const color = change < 0 ? "#00ff00" : "#ff0000";
+        const color = change < 0 ? '#00ff00' : '#ff0000';
         const style = `color: ${color}; text-align: center; font-size: 12px; font-weight: bold; padding: 0; line-height: 1.0;`;
 
         this._line1.set_text(`${currentPrice.toFixed(2)}(${addSign(change.toFixed(2))})`);
@@ -112,11 +148,23 @@ export default class StockTickerExtension extends Extension {
         this._line2.style = style;
     }
 
-    _fetchAndUpdateData() {
-        const data = getSinaStockPrice(STOCK_CODE);
-        this._cachedData = data;
-        this._lastFetchTime = Date.now();
-        this._updateDisplayWithData(data);
+    async _fetchAndUpdateData() {
+        // Guard against overlapping requests if a tick fires while one is in flight.
+        if (this._inFlight)
+            return;
+        this._inFlight = true;
+        try {
+            const data = await getSinaStockPrice(STOCK_CODE);
+            this._cachedData = data;
+            this._lastFetchTime = Date.now();
+            this._updateDisplayWithData(data);
+        } catch (e) {
+            log(`Error: ${e.message}`);
+            this._line1.set_text('Fetch failed');
+            this._line2.set_text('---');
+        } finally {
+            this._inFlight = false;
+        }
     }
 
     _updateDisplay() {
@@ -149,17 +197,17 @@ export default class StockTickerExtension extends Extension {
 
         const container = new St.BoxLayout({
             vertical: true,
-            style: "horizontal-align: center; padding: 1px 3px; min-width: 80px;"
+            style: 'horizontal-align: center; padding: 1px 3px; min-width: 80px;'
         });
 
-        this._line1 = new St.Label({ text: "0.00(+0.00)", style: "color: #ff0000; text-align: center; font-size: 12px; font-weight: bold; padding: 0; line-height: 1.0;" });
-        this._line2 = new St.Label({ text: "+0.00%", style: "color: #ff0000; text-align: center; font-size: 12px; font-weight: bold; padding: 0; line-height: 1.0;" });
+        this._line1 = new St.Label({ text: '0.00(+0.00)', style: 'color: #ff0000; text-align: center; font-size: 12px; font-weight: bold; padding: 0; line-height: 1.0;' });
+        this._line2 = new St.Label({ text: '+0.00%', style: 'color: #ff0000; text-align: center; font-size: 12px; font-weight: bold; padding: 0; line-height: 1.0;' });
 
         container.add_child(this._line1);
         container.add_child(this._line2);
         this._indicator.add_child(container);
 
-        Main.panel.addToStatusArea("stock-ticker", this._indicator, 0, "right");
+        Main.panel.addToStatusArea('stock-ticker', this._indicator, 0, 'right');
 
         // Initialize status check
         this._isInTradingPeriod = isInTradingHours();
