@@ -7,10 +7,6 @@ import * as PanelMenu from 'resource:///org/gnome/shell/ui/panelMenu.js';
 
 import {Extension} from 'resource:///org/gnome/shell/extensions/extension.js';
 
-// ByteArray bridges Uint8Array (what read_bytes_async yields in GJS 46+) and the
-// byte-string type GLib.convert expects. Without it, get_data() gets toString()'d
-// into "1,2,3,..." and the GBK→UTF8 decode silently produces garbage.
-const ByteArray = imports.byteArray;
 
 const STOCK_CODE = 'sh688256';
 const CONNECT_TIMEOUT_SEC = 5;
@@ -86,7 +82,7 @@ async function getSinaStockPrice(stockCode) {
             if (!bytesRead || bytesRead.get_size() === 0)
                 break;
 
-            chunks.push(GLib.convert(ByteArray.fromUint8Array(bytesRead.get_data()), 'UTF8', 'GBK'));
+            chunks.push(GLib.convert(bytesRead.get_data(), 'UTF8', 'GBK'));
             if (bytesRead.get_size() < bufferSize)
                 break;
         }
